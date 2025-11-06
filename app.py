@@ -1,215 +1,311 @@
 import streamlit as st
-import pandas as pd
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
-import plotly.graph_objects as go
-import plotly.express as px
+import pandas as pd
+import json
 from datetime import datetime
 
-# Configuración de página
+# Configuración de la página
 st.set_page_config(
-    page_title="📚 Recomendador Inteligente de Libros",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_title="Agente de Recomendación con Aprendizaje",
+    page_icon=" ",
+    layout="wide"
 )
 
-# CSS personalizado con colores llamativos
-st.markdown("""
-<style>
-    .main {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-    .stButton>button {
-        background: linear-gradient(90deg, #ff6b6b 0%, #ee5a6f 100%);
-        color: white;
-        font-weight: bold;
-        border-radius: 20px;
-        border: none;
-        padding: 10px 25px;
-        font-size: 16px;
-        transition: all 0.3s;
-    }
-    .stButton>button:hover {
-        transform: scale(1.05);
-        box-shadow: 0 5px 15px rgba(255,107,107,0.4);
-    }
-    .metric-card {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        padding: 20px;
-        border-radius: 15px;
-        color: white;
-        text-align: center;
-        box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-    }
-    .info-box {
-        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-        padding: 15px;
-        border-radius: 10px;
-        color: white;
-        margin: 10px 0;
-    }
-    .success-box {
-        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-        padding: 15px;
-        border-radius: 10px;
-        color: white;
-        margin: 10px 0;
-    }
-    .warning-box {
-        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-        padding: 15px;
-        border-radius: 10px;
-        color: white;
-        margin: 10px 0;
-    }
-    h1 {
-        color: #ffffff;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-    }
-    h2, h3 {
-        color: #ffffff;
-    }
-    .stDataFrame {
-        background-color: white;
-        border-radius: 10px;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# Inicialización de estado de sesión
-if 'ratings' not in st.session_state:
-    # Datos iniciales de libros
-    books = [
-        "Cien Años de Soledad", "1984", "El Principito", 
-        "Don Quijote", "Harry Potter", "El Alquimista",
-        "Orgullo y Prejuicio", "Crimen y Castigo", 
-        "El Gran Gatsby", "Moby Dick"
+# Inicialización de datos
+@st.cache_data
+def get_books():
+    return [
+        {"id": 1, "title": "Cien años de soledad", "author": "Gabriel García Márquez", "genre": "Realismo mágico"},
+        {"id": 2, "title": "1984", "author": "George Orwell", "genre": "Distopía"},
+        {"id": 3, "title": "El principito", "author": "Antoine de Saint-Exupéry", "genre": "Filosofía"},
+        {"id": 4, "title": "Sapiens", "author": "Yuval Noah Harari", "genre": "Historia"},
+        {"id": 5, "title": "Orgullo y prejuicio", "author": "Jane Austen", "genre": "Romance"},
+        {"id": 6, "title": "El código Da Vinci", "author": "Dan Brown", "genre": "Suspenso"},
+        {"id": 7, "title": "Dune", "author": "Frank Herbert", "genre": "Ciencia ficción"},
+        {"id": 8, "title": "Rayuela", "author": "Julio Cortázar", "genre": "Realismo mágico"},
+        {"id": 9, "title": "La sombra del viento", "author": "Carlos Ruiz Zafón", "genre": "Suspenso"},
+        {"id": 10, "title": "El gen egoísta", "author": "Richard Dawkins", "genre": "Ciencia"}
     ]
+
+# Inicializar el estado de sesión
+if 'q_table' not in st.session_state:
+    books = get_books()
+    q_table = {}
+    for book in books:
+        if book['genre'] not in q_table:
+            q_table[book['genre']] = {}
+        q_table[book['genre']][book['id']] = 0.0
+    st.session_state.q_table = q_table
+
+if 'history' not in st.session_state:
+    st.session_state.history = []
+
+if 'current_recommendation' not in st.session_state:
+    st.session_state.current_recommendation = None
+
+if 'total_interactions' not in st.session_state:
+    st.session_state.total_interactions = 0
+
+if 'learning_rate' not in st.session_state:
+    st.session_state.learning_rate = 0.1
+
+if 'exploration_rate' not in st.session_state:
+    st.session_state.exploration_rate = 0.3
+
+# Funciones del agente
+def select_book_qlearning(books, q_table, exploration_rate):
+    """Selecciona un libro usando estrategia epsilon-greedy"""
+    if np.random.random() < exploration_rate:
+        # Exploración: libro aleatorio
+        return np.random.choice(books)
+    else:
+        # Explotación: mejor libro según Q-table
+        best_book = None
+        best_q = float('-inf')
+        
+        for book in books:
+            q_value = q_table.get(book['genre'], {}).get(book['id'], 0)
+            if q_value > best_q:
+                best_q = q_value
+                best_book = book
+        
+        return best_book if best_book else np.random.choice(books)
+
+def update_q_value(q_table, book, reward, learning_rate):
+    """Actualiza el valor Q usando la fórmula de Q-Learning"""
+    genre = book['genre']
+    book_id = book['id']
     
-    users = ["Ana", "Luis", "Carlos", "María", "José"]
+    old_q = q_table[genre][book_id]
+    new_q = old_q + learning_rate * (reward - old_q)
+    q_table[genre][book_id] = new_q
     
-    # Calificaciones iniciales aleatorias
-    st.session_state.ratings = pd.DataFrame(
-        np.random.randint(1, 6, size=(len(users), len(books))),
-        index=users,
-        columns=books
+    return new_q
+
+def get_top_genres(q_table):
+    """Obtiene los géneros mejor valorados"""
+    genre_scores = {}
+    for genre, books in q_table.items():
+        if books:
+            genre_scores[genre] = np.mean(list(books.values()))
+    
+    sorted_genres = sorted(genre_scores.items(), key=lambda x: x[1], reverse=True)
+    return sorted_genres[:3]
+
+# Interfaz principal
+st.title(" Agente Inteligente: Sistema de Recomendación con Aprendizaje")
+st.markdown("**Aprendizaje por Refuerzo (Q-Learning) aplicado a libros**")
+
+# Descripción del problema
+with st.expander(" Descripción del Problema", expanded=True):
+    st.markdown("""
+    El agente debe **aprender las preferencias del usuario** sobre libros mediante la interacción.
+    Utiliza **Q-Learning**, un algoritmo de aprendizaje por refuerzo donde el agente:
+    
+    - **Explora**: Recomienda libros aleatorios inicialmente
+    - **Aprende**: Ajusta valores Q según feedback ( = +1,  = -1)
+    - **Explota**: Prioriza géneros y libros con mejor puntuación
+    """)
+
+# Métricas principales
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.metric(" Interacciones", st.session_state.total_interactions)
+
+with col2:
+    success_count = len([h for h in st.session_state.history if h['feedback'] == 'Positivo'])
+    success_rate = (success_count / st.session_state.total_interactions * 100) if st.session_state.total_interactions > 0 else 0
+    st.metric(" Tasa de Éxito", f"{success_rate:.1f}%")
+
+with col3:
+    st.metric(" Exploración", f"{st.session_state.exploration_rate * 100:.0f}%")
+
+# Layout principal
+col_left, col_right = st.columns([1, 1])
+
+with col_left:
+    st.subheader(" Recomendación del Agente")
+    
+    if st.session_state.current_recommendation is None:
+        if st.button(" Obtener Recomendación", type="primary", use_container_width=True):
+            books = get_books()
+            book = select_book_qlearning(books, st.session_state.q_table, st.session_state.exploration_rate)
+            st.session_state.current_recommendation = book
+            st.rerun()
+    else:
+        book = st.session_state.current_recommendation
+        
+        # Mostrar libro recomendado
+        st.info(f"""
+        ###  {book['title']}
+        **Autor:** {book['author']}  
+        **Género:** {book['genre']}  
+        **Q-Value:** {st.session_state.q_table[book['genre']][book['id']]:.3f}
+        """)
+        
+        # Botones de feedback
+        col_like, col_dislike = st.columns(2)
+        
+        with col_like:
+            if st.button(" Me gusta", use_container_width=True):
+                new_q = update_q_value(st.session_state.q_table, book, 1, st.session_state.learning_rate)
+                
+                st.session_state.history.append({
+                    'book': book['title'],
+                    'genre': book['genre'],
+                    'feedback': 'Positivo',
+                    'q_value': f"{new_q:.3f}",
+                    'timestamp': datetime.now().strftime("%H:%M:%S")
+                })
+                
+                st.session_state.total_interactions += 1
+                st.session_state.exploration_rate = max(0.05, st.session_state.exploration_rate - 0.01)
+                st.session_state.current_recommendation = None
+                st.rerun()
+        
+        with col_dislike:
+            if st.button(" No me gusta", use_container_width=True):
+                new_q = update_q_value(st.session_state.q_table, book, -1, st.session_state.learning_rate)
+                
+                st.session_state.history.append({
+                    'book': book['title'],
+                    'genre': book['genre'],
+                    'feedback': 'Negativo',
+                    'q_value': f"{new_q:.3f}",
+                    'timestamp': datetime.now().strftime("%H:%M:%S")
+                })
+                
+                st.session_state.total_interactions += 1
+                st.session_state.exploration_rate = max(0.05, st.session_state.exploration_rate - 0.01)
+                st.session_state.current_recommendation = None
+                st.rerun()
+    
+    # Géneros preferidos
+    st.subheader("🏆 Géneros Preferidos")
+    top_genres = get_top_genres(st.session_state.q_table)
+    
+    if top_genres:
+        medals = ['🥇', '🥈', '🥉']
+        for i, (genre, score) in enumerate(top_genres):
+            progress = max(0, min(1, (score + 1) / 2))
+            st.markdown(f"{medals[i]} **{genre}** - Score: {score:.3f}")
+            st.progress(progress)
+    else:
+        st.info("El agente aún no tiene preferencias aprendidas")
+
+with col_right:
+    st.subheader(" Historial de Aprendizaje")
+    
+    if st.button(" Reiniciar Agente", use_container_width=True):
+        for key in ['q_table', 'history', 'current_recommendation', 'total_interactions']:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.session_state.exploration_rate = 0.3
+        st.rerun()
+    
+    if st.session_state.history:
+        for i, item in enumerate(reversed(st.session_state.history[-15:])):
+            color = "green" if item['feedback'] == 'Positivo' else "red"
+            st.markdown(f"""
+            <div style='background-color: #f0f2f6; padding: 10px; border-radius: 5px; margin-bottom: 8px; border-left: 4px solid {color};'>
+                <strong>{item['book']}</strong><br/>
+                <small>{item['genre']} | {item['feedback']} | Q: {item['q_value']} | {item['timestamp']}</small>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.info("No hay interacciones aún")
+
+# Algoritmo y análisis
+st.markdown("---")
+st.header(" Algoritmo Q-Learning")
+
+col_algo, col_analysis = st.columns(2)
+
+with col_algo:
+    st.code("""
+# PSEUDOCÓDIGO Q-LEARNING
+
+1. Inicialización:
+   Q(género, libro) = 0 para todos
+
+2. Para cada interacción:
+   
+   a) Selección (ε-greedy):
+      Si rand() < ε:
+         acción = libro_aleatorio()  # Explorar
+      Sino:
+         acción = max_Q(libros)      # Explotar
+   
+   b) Ejecutar acción y obtener recompensa:
+      recompensa = +1 si 
+      recompensa = -1 si 
+   
+   c) Actualizar Q-value:
+      Q_nuevo = Q_viejo + α(recompensa - Q_viejo)
+      
+      donde α = learning_rate (0.1)
+   
+   d) Reducir exploración:
+      ε = max(0.05, ε - 0.01)
+
+3. Repetir hasta convergencia
+    """, language="python")
+
+with col_analysis:
+    st.success("""
+    ** Ventajas**
+    - Aprende de la interacción sin supervisión
+    - Se adapta a preferencias cambiantes
+    - No requiere datos previos de entrenamiento
+    - Mejora continuamente con el uso
+    """)
+    
+    st.warning("""
+    ** Limitaciones**
+    - Necesita muchas interacciones iniciales
+    - Exploración puede dar malas recomendaciones
+    - Sensible a hiperparámetros
+    - No considera contexto temporal
+    """)
+    
+    st.info("""
+    ** Aplicaciones Reales**
+    - **Netflix/Spotify:** Recomendaciones personalizadas
+    - **E-commerce:** Amazon, Alibaba (productos)
+    - **Publicidad:** Google Ads, Facebook (optimización)
+    - **Videojuegos:** Ajuste de dificultad dinámico
+    """)
+
+# Configuración avanzada
+with st.expander(" Configuración Avanzada"):
+    st.session_state.learning_rate = st.slider(
+        "Tasa de Aprendizaje (α)", 
+        0.01, 0.5, 
+        st.session_state.learning_rate,
+        help="Controla qué tan rápido el agente aprende de nuevas experiencias"
     )
     
-    # Historial de interacciones
-    st.session_state.history = []
-    
-    # Parámetros de aprendizaje
-    st.session_state.epsilon = 0.3  # Factor de exploración
-    st.session_state.total_interactions = 0
-    st.session_state.rewards = []
-
-# Título principal
-st.markdown("<h1 style='text-align: center;'>📚 SISTEMA INTELIGENTE DE RECOMENDACIÓN DE LIBROS</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: white; font-size: 18px;'>Agente basado en Aprendizaje por Refuerzo Simulado</p>", unsafe_allow_html=True)
-
-# Sidebar con información del algoritmo
-with st.sidebar:
-    st.markdown("### 🎯 Algoritmo de Aprendizaje")
-    st.markdown("""
-    <div class='info-box'>
-    <b>Estrategia ε-greedy:</b><br>
-    • <b>Exploración (ε)</b>: Recomienda libros aleatorios<br>
-    • <b>Explotación (1-ε)</b>: Usa similitud coseno<br>
-    • Se adapta con cada interacción
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("### 📊 Métricas de Aprendizaje")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Interacciones", st.session_state.total_interactions, 
-                 delta="+1" if st.session_state.total_interactions > 0 else None)
-    with col2:
-        epsilon_pct = int(st.session_state.epsilon * 100)
-        st.metric("Exploración", f"{epsilon_pct}%")
-    
-    if st.session_state.rewards:
-        avg_reward = np.mean(st.session_state.rewards[-10:])
-        st.metric("Recompensa Promedio", f"{avg_reward:.2f}")
-
-# Tabs principales
-tab1, tab2, tab3, tab4 = st.tabs(["🎮 Agente Interactivo", "📈 Matriz de Conocimiento", "🧠 Análisis", "📖 Documentación"])
-
-with tab1:
-    st.markdown("## 🤖 Interacción con el Agente")
-    
-    col1, col2 = st.columns([2, 1])
-    
-   
-with tab4:
-    st.markdown("## 📖 Documentación Técnica")
-    
-    st.markdown("""
-    <div class='info-box'>
-    <h3>🎯 Descripción del Problema</h3>
-    <p>
-    Un sistema de recomendación debe sugerir libros relevantes a usuarios basándose en sus preferencias.
-    El desafío es balancear entre recomendar libros conocidos (explotación) y descubrir nuevos intereses (exploración).
-    </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class='success-box'>
-    <h3>⚙️ Algoritmo Implementado: ε-Greedy</h3>
-    <pre style='background: rgba(255,255,255,0.2); padding: 15px; border-radius: 10px;'>
-PSEUDOCÓDIGO:
-
-Inicializar:
-    ε = 0.3  // Factor de exploración inicial
-    ratings = matriz_de_calificaciones()
-    
-Función recomendar(usuario):
-    si random() < ε:
-        // EXPLORACIÓN
-        libro = seleccionar_aleatorio(libros)
-    sino:
-        // EXPLOTACIÓN
-        mejor_libro = max_calificado(usuario)
-        similitud = calcular_similitud_coseno(ratings)
-        libro = más_similar(mejor_libro, similitud)
-    
-    retornar libro
-
-Función actualizar_conocimiento(usuario, libro, calificación):
-    // Actualizar matriz de conocimiento
-    ratings[usuario][libro] = calificación
-    
-    // Calcular recompensa
-    reward = (calificación - 1) / 4  // Normalizar [0, 1]
-    
-    // Decrementar exploración (más explotación con el tiempo)
-    ε = max(0.1, ε × 0.95)
-    
-    retornar reward
-    </pre>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class='warning-box'>
-    <h3>🔬 Componentes del Sistema</h3>
-    <ol>
-        <li><b>Matriz de Conocimiento:</b> Almacena calificaciones usuario-libro</li>
-        <li><b>Similitud Coseno:</b> Mide similitud entre libros basada en patrones de calificación</li>
-        <li><b>Estrategia ε-greedy:</b> Balance entre exploración y explotación</li>
-        <li><b>Sistema de Recompensas:</b> Feedback para mejorar recomendaciones</li>
-        <li><b>Decaimiento de ε:</b> Reduce exploración gradualmente</li>
-    </ol>
-    </div>
-    """, unsafe_allow_html=True)
+    # Mostrar Q-Table completa
+    if st.checkbox("Mostrar Q-Table completa"):
+        q_data = []
+        for genre, books in st.session_state.q_table.items():
+            for book_id, q_value in books.items():
+                book_info = next((b for b in get_books() if b['id'] == book_id), None)
+                if book_info:
+                    q_data.append({
+                        'Libro': book_info['title'],
+                        'Género': genre,
+                        'Q-Value': f"{q_value:.3f}"
+                    })
+        
+        df = pd.DataFrame(q_data)
+        st.dataframe(df, use_container_width=True)
 
 # Footer
 st.markdown("---")
 st.markdown("""
-<div style='text-align: center; color: white;'>
-    <p>🚀 Sistema Inteligente de Recomendación | Desarrollado con Streamlit & Python</p>
-    <p>💡 Aprendizaje por Refuerzo Simulado con estrategia ε-greedy</p>
+<div style='text-align: center; color: #666;'>
+    <small>Proyecto de Agentes Inteligentes y Herramientas de IA - Bloque A: Ejercicios Aplicados</small>
 </div>
 """, unsafe_allow_html=True)
