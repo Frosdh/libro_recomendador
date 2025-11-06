@@ -12,20 +12,80 @@ st.set_page_config(
 )
 
 # Inicialización de datos
+# Inicialización de datos
 @st.cache_data
 def get_books():
     return [
+        # --- REALISMO MÁGICO ---
         {"id": 1, "title": "Cien años de soledad", "author": "Gabriel García Márquez", "genre": "Realismo mágico"},
-        {"id": 2, "title": "1984", "author": "George Orwell", "genre": "Distopía"},
-        {"id": 3, "title": "El principito", "author": "Antoine de Saint-Exupéry", "genre": "Filosofía"},
-        {"id": 4, "title": "Sapiens", "author": "Yuval Noah Harari", "genre": "Historia"},
-        {"id": 5, "title": "Orgullo y prejuicio", "author": "Jane Austen", "genre": "Romance"},
-        {"id": 6, "title": "El código Da Vinci", "author": "Dan Brown", "genre": "Suspenso"},
-        {"id": 7, "title": "Dune", "author": "Frank Herbert", "genre": "Ciencia ficción"},
         {"id": 8, "title": "Rayuela", "author": "Julio Cortázar", "genre": "Realismo mágico"},
+        {"id": 11, "title": "Pedro Páramo", "author": "Juan Rulfo", "genre": "Realismo mágico"},
+        {"id": 12, "title": "La casa de los espíritus", "author": "Isabel Allende", "genre": "Realismo mágico"},
+
+        # --- DISTOPÍA ---
+        {"id": 2, "title": "1984", "author": "George Orwell", "genre": "Distopía"},
+        {"id": 13, "title": "Un mundo feliz", "author": "Aldous Huxley", "genre": "Distopía"},
+        {"id": 14, "title": "Fahrenheit 451", "author": "Ray Bradbury", "genre": "Distopía"},
+
+        # --- FILOSOFÍA ---
+        {"id": 3, "title": "El principito", "author": "Antoine de Saint-Exupéry", "genre": "Filosofía"},
+        {"id": 15, "title": "Meditaciones", "author": "Marco Aurelio", "genre": "Filosofía"},
+        {"id": 16, "title": "Así habló Zaratustra", "author": "Friedrich Nietzsche", "genre": "Filosofía"},
+        {"id": 17, "title": "La república", "author": "Platón", "genre": "Filosofía"},
+
+        # --- HISTORIA ---
+        {"id": 4, "title": "Sapiens", "author": "Yuval Noah Harari", "genre": "Historia"},
+        {"id": 18, "title": "Homo Deus", "author": "Yuval Noah Harari", "genre": "Historia"},
+        {"id": 19, "title": "Los pilares de la Tierra", "author": "Ken Follett", "genre": "Historia"},
+        {"id": 20, "title": "Breve historia del tiempo", "author": "Stephen Hawking", "genre": "Historia"},
+
+        # --- ROMANCE ---
+        {"id": 5, "title": "Orgullo y prejuicio", "author": "Jane Austen", "genre": "Romance"},
+        {"id": 21, "title": "Romeo y Julieta", "author": "William Shakespeare", "genre": "Romance"},
+        {"id": 22, "title": "Bajo la misma estrella", "author": "John Green", "genre": "Romance"},
+        {"id": 23, "title": "Posdata: Te amo", "author": "Cecelia Ahern", "genre": "Romance"},
+
+        # --- SUSPENSO / MISTERIO ---
+        {"id": 6, "title": "El código Da Vinci", "author": "Dan Brown", "genre": "Suspenso"},
         {"id": 9, "title": "La sombra del viento", "author": "Carlos Ruiz Zafón", "genre": "Suspenso"},
-        {"id": 10, "title": "El gen egoísta", "author": "Richard Dawkins", "genre": "Ciencia"}
+        {"id": 24, "title": "Asesinato en el Orient Express", "author": "Agatha Christie", "genre": "Suspenso"},
+        {"id": 25, "title": "El silencio de los corderos", "author": "Thomas Harris", "genre": "Suspenso"},
+
+        # --- CIENCIA Y DIVULGACIÓN ---
+        {"id": 10, "title": "El gen egoísta", "author": "Richard Dawkins", "genre": "Ciencia"},
+        {"id": 26, "title": "Cosmos", "author": "Carl Sagan", "genre": "Ciencia"},
+        {"id": 27, "title": "El universo en una cáscara de nuez", "author": "Stephen Hawking", "genre": "Ciencia"},
+        {"id": 28, "title": "Pensar rápido, pensar despacio", "author": "Daniel Kahneman", "genre": "Ciencia"},
+
+        # --- CIENCIA FICCIÓN ---
+        {"id": 7, "title": "Dune", "author": "Frank Herbert", "genre": "Ciencia ficción"},
+        {"id": 29, "title": "Fundación", "author": "Isaac Asimov", "genre": "Ciencia ficción"},
+        {"id": 30, "title": "Neuromante", "author": "William Gibson", "genre": "Ciencia ficción"},
+        {"id": 31, "title": "Snow Crash", "author": "Neal Stephenson", "genre": "Ciencia ficción"},
+
+        # --- FANTASÍA ---
+        {"id": 32, "title": "El señor de los anillos", "author": "J.R.R. Tolkien", "genre": "Fantasía"},
+        {"id": 33, "title": "Harry Potter y la piedra filosofal", "author": "J.K. Rowling", "genre": "Fantasía"},
+        {"id": 34, "title": "Las crónicas de Narnia", "author": "C.S. Lewis", "genre": "Fantasía"},
+        {"id": 35, "title": "La rueda del tiempo", "author": "Robert Jordan", "genre": "Fantasía"},
+
+        # --- POESÍA ---
+        {"id": 36, "title": "Veinte poemas de amor y una canción desesperada", "author": "Pablo Neruda", "genre": "Poesía"},
+        {"id": 37, "title": "Hojas de hierba", "author": "Walt Whitman", "genre": "Poesía"},
+        {"id": 38, "title": "Ariel", "author": "Sylvia Plath", "genre": "Poesía"},
+
+        # --- AUTOAYUDA / MOTIVACIÓN ---
+        {"id": 39, "title": "Los 7 hábitos de la gente altamente efectiva", "author": "Stephen Covey", "genre": "Autoayuda"},
+        {"id": 40, "title": "Cómo ganar amigos e influir sobre las personas", "author": "Dale Carnegie", "genre": "Autoayuda"},
+        {"id": 41, "title": "El monje que vendió su Ferrari", "author": "Robin Sharma", "genre": "Autoayuda"},
+        {"id": 42, "title": "Piense y hágase rico", "author": "Napoleon Hill", "genre": "Autoayuda"},
+
+        # --- EDUCACIÓN / PSICOLOGÍA ---
+        {"id": 43, "title": "El elemento", "author": "Ken Robinson", "genre": "Educación"},
+        {"id": 44, "title": "La inteligencia emocional", "author": "Daniel Goleman", "genre": "Psicología"},
+        {"id": 45, "title": "Mindset: La actitud del éxito", "author": "Carol Dweck", "genre": "Psicología"},
     ]
+
 
 # Inicializar el estado de sesión
 if 'q_table' not in st.session_state:
